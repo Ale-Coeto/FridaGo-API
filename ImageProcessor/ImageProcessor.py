@@ -11,6 +11,11 @@ class ImageProcessor():
     def __init__(self, camera_index=1) -> None:
         self.cap = cv2.VideoCapture("videos/x.mp4")
         self.aisle_analyzer = AisleAnalyzer()
+        success, frame = self.cap.read()
+        if not success:
+            return None
+        
+        frame = self.aisle_analyzer.get_person_detections(frame)
         
     def get_frame(self):
         success, frame = self.cap.read()

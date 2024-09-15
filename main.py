@@ -1,9 +1,17 @@
 from fastapi import FastAPI, Response
 from ImageProcessor.ImageProcessor import ImageProcessor
+from ImageProcessor.CheckoutProcessor import CheckoutProcessor
 from fastapi.responses import StreamingResponse
 import uvicorn
 
 image_processor = ImageProcessor()
+
+analyzer = CheckoutProcessor()
+
+checkout_analyzers = []
+
+for i in range(1):
+    checkout_analyzers.append(CheckoutProcessor(i))
 
 # API 
 app = FastAPI()
@@ -50,6 +58,18 @@ async def get_trajectories():
 @app.get("/")
 def read_root():
     return {"Message": "TCC-API"}
+
+@app.get("/get_wait_time")
+def get_wait_time():
+    # return StreamingResponse(analyzer.count_people(), media_type='application/json')
+    # return analyzer.count_people()
+    lines = {}
+    for i, checkout_analyzer in enumerate(checkout_analyzers):
+        count = checkout_analyzer.count_people()
+        lines["Line " + str(i + 1)] = count*4
+    
+    return lines
+
 
 # Entry point to run the server
 if __name__ == "__main__":
