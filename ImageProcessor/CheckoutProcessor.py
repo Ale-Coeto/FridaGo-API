@@ -3,20 +3,14 @@ from ImageProcessor.CheckoutAnalyzer.CheckoutAnalyzer import CheckoutAnalyzer
 
 '''
     Class to process images from a camera 
-    GetFrame method returns the regular stream
-    GetAileView method returns the stream with person detections
+    Count people returns the number of people in the line
+    GetSentiments returns the sentiments of the person with largest detection
 '''
 
 class CheckoutProcessor():
     def __init__(self, camera_index=1) -> None:
         self.cap = cv2.VideoCapture(camera_index)
         self.checkout_analyzer = CheckoutAnalyzer()
-        
-        # while True:
-        #     success, frame = self.cap.read()
-        #     if not success:
-        #         break
-        #     frame = self.checkout_analyzer.get_person_detections(frame)
         
     def count_people(self):
         success, frame = self.cap.read()

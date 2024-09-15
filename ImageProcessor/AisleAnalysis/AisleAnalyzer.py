@@ -111,6 +111,11 @@ class AisleAnalyzer:
                 cv2.putText(frame, str(track_id), (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
+        if len(self.points) > 10000:
+            self.points = self.points[::10]
+            self.paths = {{k: v[::10] for k, v in self.paths.items()}}
+
+        
         return frame
 
     def get_common_paths(self):

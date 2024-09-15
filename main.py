@@ -2,10 +2,10 @@ from fastapi import FastAPI, Response
 from ImageProcessor.ImageProcessor import ImageProcessor
 from ImageProcessor.CheckoutProcessor import CheckoutProcessor
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 image_processor = ImageProcessor()
-
 analyzer = CheckoutProcessor()
 
 checkout_analyzers = []
@@ -15,6 +15,13 @@ for i in range(2):
 
 # API 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def generate_frames(view):
     while True:
@@ -33,7 +40,6 @@ def get_heatmap():
         return None
     yield (b'--frame\r\n'
               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-    # return image_processor.get_heatmap()
 
 @app.get("/video_feed")
 async def video_feed():
@@ -45,8 +51,6 @@ async def aisle_view():
 
 @app.get("/get_heatmap")
 async def get_heatmap():
-    # return image_processor.get_heatmap as encoded image
-
     result = image_processor.get_heatmap()
     return Response(content=result, media_type="image/jpeg")
 
@@ -61,8 +65,6 @@ def read_root():
 
 @app.get("/get_wait_time")
 def get_wait_time():
-    # return StreamingResponse(analyzer.count_people(), media_type='application/json')
-    # return analyzer.count_people()
     lines = {}
     for i, checkout_analyzer in enumerate(checkout_analyzers):
         count = checkout_analyzer.count_people()
