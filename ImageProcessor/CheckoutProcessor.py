@@ -9,7 +9,7 @@ from ImageProcessor.CheckoutAnalyzer.CheckoutAnalyzer import CheckoutAnalyzer
 
 class CheckoutProcessor():
     def __init__(self, camera_index=1) -> None:
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(camera_index)
         self.checkout_analyzer = CheckoutAnalyzer()
         
         # while True:
@@ -25,3 +25,11 @@ class CheckoutProcessor():
         
         count = self.checkout_analyzer.count_people(frame)
         return count
+
+    def get_sentiments(self):
+        success, frame = self.cap.read()
+        if not success:
+            return None
+        
+        sentiments = self.checkout_analyzer.get_sentiments(frame)
+        return sentiments

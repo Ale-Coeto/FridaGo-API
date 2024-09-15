@@ -1,2 +1,5 @@
 *__pycache__/
 *.bin
+*.gitignore
+*.xml
+openvino_env/

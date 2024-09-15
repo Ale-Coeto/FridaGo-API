@@ -10,7 +10,7 @@ analyzer = CheckoutProcessor()
 
 checkout_analyzers = []
 
-for i in range(1):
+for i in range(2):
     checkout_analyzers.append(CheckoutProcessor(i))
 
 # API 
@@ -70,6 +70,13 @@ def get_wait_time():
     
     return lines
 
+@app.get("/get_sentiments")
+def get_sentiments():
+    lines = {}
+    for i, checkout_analyzer in enumerate(checkout_analyzers):
+        sentiments = checkout_analyzer.get_sentiments()
+        lines["Line " + str(i + 1)] = sentiments
+    return lines
 
 # Entry point to run the server
 if __name__ == "__main__":

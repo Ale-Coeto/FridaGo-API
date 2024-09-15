@@ -10,6 +10,7 @@ import collections
 from sklearn.cluster import SpectralClustering
 import numpy as np
 from dtaidistance import dtw
+from openvino.runtime import Core, Tensor
 
 class CheckoutAnalyzer:
 
@@ -56,6 +57,23 @@ class CheckoutAnalyzer:
         det_ov_model = core.read_model(det_model_path)
         ov_config = {}
 
+        # Load and compile the face detection model
+        face_model_path = "models/face-detection-adas-0001/face-detection-adas-0001.xml"
+        face_model = core.read_model(face_model_path)
+        self.face_compiled_model = core.compile_model(face_model, "CPU")
+
+        # Load and compile the emotion recognition model
+        emotion_model_path = "models/emotions-recognition-retail-0003/emotions-recognition-retail-0003.xml"
+        emotion_model = core.read_model(emotion_model_path)
+        self.emotion_compiled_model = core.compile_model(emotion_model, "CPU")
+
+        def get_input_size(model):
+            input_tensor = model.input(0)  # Get the first input tensor
+            input_shape = input_tensor.shape
+            return (input_shape[3], input_shape[2])  # (width, height)
+
+        self.face_input_size = get_input_size(face_model)
+        self.emotion_input_size = get_input_size(emotion_model)
 
         if device.value != "CPU":
             det_ov_model.reshape({0: [1, 3, 640, 640]})
@@ -71,6 +89,60 @@ class CheckoutAnalyzer:
         self.det_model.predictor.inference = infer
         self.det_model.predictor.model.pt = False
 
+    def preprocess_face(self, image, input_size):
+        resized_image = cv2.resize(image, (input_size[0], input_size[1]))
+        resized_image = resized_image.astype(np.float32)  # Convert to float32
+        resized_image = resized_image.transpose((2, 0, 1))  # Change to CHW format
+        resized_image = resized_image[None, :]  # Add batch dimension
+        return resized_image
+
+    def preprocess_emotion(self, face_image, input_size):
+        resized_face = cv2.resize(face_image, (input_size[0], input_size[1]))
+        resized_face = resized_face.astype(np.float32)  # Convert to float32
+        resized_face = resized_face.transpose((2, 0, 1))  # Change to CHW format
+        resized_face = resized_face[None, :]  # Add batch dimension
+        return resized_face
+    
+    def postprocess_emotion(self, output):
+        emotions = ["neutral", "happiness", "surprise", "anger", "sadness"]
+        emotion_scores = output[0] 
+        probabilities = np.array(emotion_scores).flatten()
+        top_indices = np.argsort(probabilities)[::-1][:2]
+        top_emotions = [emotions[index] for index in top_indices]
+        return top_emotions
+    
+    # Post-process the output to extract faces
+    def postprocess_face(self, output, image, threshold=0.5):
+        boxes = []
+        for detection in output[0][0]:  # Loop through all detections
+            if detection[2] > threshold:  # Confidence threshold
+                xmin = int(detection[3] * image.shape[1])
+                ymin = int(detection[4] * image.shape[0])
+                xmax = int(detection[5] * image.shape[1])
+                ymax = int(detection[6] * image.shape[0])
+                boxes.append((xmin, ymin, xmax, ymax))
+        return boxes
+    
+    def preprocess_face(self, image, input_size):
+        resized_image = cv2.resize(image, (input_size[0], input_size[1]))
+        resized_image = resized_image.astype(np.float32)  # Convert to float32
+        resized_image = resized_image.transpose((2, 0, 1))  # Change to CHW format
+        resized_image = resized_image[None, :]  # Add batch dimension
+        return resized_image
+
+    # Post-process the output to extract faces
+    def postprocess_face(self, output, image, threshold=0.5):
+        boxes = []
+        for detection in output[0][0]:  # Loop through all detections
+            if detection[2] > threshold:  # Confidence threshold
+                xmin = int(detection[3] * image.shape[1])
+                ymin = int(detection[4] * image.shape[0])
+                xmax = int(detection[5] * image.shape[1])
+                ymax = int(detection[6] * image.shape[0])
+                boxes.append((xmin, ymin, xmax, ymax))
+        return boxes
+    
+    # @classmethod
     def count_people(self, frame):
         count = 0
         frame_center_x = int(frame.shape[1] / 2)
@@ -96,6 +168,63 @@ class CheckoutAnalyzer:
 
                 else:
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                cv2.imwrite("videos/frame.jpg", frame)
+                cv2.imwrite("videos/lines.jpg", frame)
 
         return count
+    
+    def get_sentiments(self, image):
+        preprocessed_image = self.preprocess_face(image, self.face_input_size)
+
+        # Convert NumPy array to OpenVINO Tensor
+        input_tensor = Tensor(preprocessed_image)
+
+        # Perform face detection inference
+        face_infer_request = self.face_compiled_model.create_infer_request()
+        face_infer_request.set_input_tensor(input_tensor)
+        face_infer_request.infer()
+        face_output = face_infer_request.get_output_tensor().data
+
+        # Post-process the face detection output
+        detected_faces = self.postprocess_face(face_output, image)
+        original_image = image.copy()
+
+        sentiments = []
+        # Process each detected face for emotion recognition
+
+        largest_face = None
+        for (xmin, ymin, xmax, ymax) in detected_faces:
+            face_region = original_image[ymin:ymax, xmin:xmax]
+
+            # area
+            if largest_face is None:
+                largest_face = (xmin, ymin, xmax, ymax)
+            else:
+                if (xmax - xmin) * (ymax - ymin) > (largest_face[2] - largest_face[0]) * (largest_face[3] - largest_face[1]):
+                    largest_face = (xmin, ymin, xmax, ymax)
+            
+            
+            # Draw bounding boxes and emotion labels on the original image
+        
+        # Preprocess the face region for emotion recognition
+        if largest_face is None:
+            return sentiments
+        xmin, ymin, xmax, ymax = largest_face
+        face_region = original_image[ymin:ymax, xmin:xmax]
+        preprocessed_face = self.preprocess_emotion(face_region, self.emotion_input_size)
+        cv2.rectangle(original_image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+        # Convert NumPy array to OpenVINO Tensor
+        emotion_tensor = Tensor(preprocessed_face)
+        
+        # Perform emotion recognition inference
+        emotion_infer_request = self.emotion_compiled_model.create_infer_request()
+        emotion_infer_request.set_input_tensor(emotion_tensor)
+        emotion_infer_request.infer()
+        emotion_output = emotion_infer_request.get_output_tensor().data
+        
+        # Post-process the emotion recognition output
+        emotions = self.postprocess_emotion(emotion_output)
+        sentiments.append(emotions)
+        emotions = " ".join(emotions)
+        cv2.putText(original_image, emotions, (xmin, ymin), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.imwrite("videos/sentiment.jpg", original_image)
+        return sentiments
