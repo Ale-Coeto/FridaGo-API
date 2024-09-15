@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from ImageProcessor.ImageProcessor import ImageProcessor
 from fastapi.responses import StreamingResponse
 import uvicorn
@@ -19,6 +19,14 @@ def generate_frames(view):
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
+def get_heatmap():
+    frame_bytes = image_processor.get_heatmap()
+    if frame_bytes is None:
+        return None
+    yield (b'--frame\r\n'
+              b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+    # return image_processor.get_heatmap()
+
 @app.get("/video_feed")
 async def video_feed():
     return StreamingResponse(generate_frames(1), media_type='multipart/x-mixed-replace; boundary=frame')
@@ -29,11 +37,15 @@ async def aisle_view():
 
 @app.get("/get_heatmap")
 async def get_heatmap():
-    return image_processor.get_heatmap()
+    # return image_processor.get_heatmap as encoded image
 
-@app.get("/get_common_paths")
-async def get_common_paths():
-    return image_processor.get_common_paths()
+    result = image_processor.get_heatmap()
+    return Response(content=result, media_type="image/jpeg")
+
+@app.get("/get_trajectories")
+async def get_trajectories():
+    result = image_processor.get_common_paths()
+    return Response(content=result, media_type="image/jpeg")
 
 @app.get("/")
 def read_root():

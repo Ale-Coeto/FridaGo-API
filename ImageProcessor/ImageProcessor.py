@@ -9,8 +9,7 @@ from ImageProcessor.Utils.PersonDetector import PersonDetector
 
 class ImageProcessor():
     def __init__(self, camera_index=1) -> None:
-        # self.cap = cv2.VideoCapture(0)
-        self.cap = cv2.VideoCapture("videos/store.mp4")
+        self.cap = cv2.VideoCapture("videos/x.mp4")
         self.person_detector = PersonDetector()
         
     def get_frame(self):
@@ -28,7 +27,6 @@ class ImageProcessor():
         if not success:
             return None
         
-        # write text in image
         frame = self.person_detector.get_detections(frame)
         ret, buffer = cv2.imencode('.jpg', frame)
         if not ret:
@@ -36,8 +34,16 @@ class ImageProcessor():
         return buffer.tobytes()  
     
     def get_heatmap(self):
-        return self.person_detector.get_heatmap()
+        frame = self.person_detector.get_heatmap()
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            return None
+        return buffer.tobytes()
     
     def get_common_paths(self):
-        return self.person_detector.get_common_paths()
+        image = self.person_detector.get_common_paths()
+        ret, buffer = cv2.imencode('.jpg', image)
+        if not ret:
+            return None
+        return buffer.tobytes() 
     
